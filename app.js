@@ -3,6 +3,7 @@ import {initialState,surgical,diagnostic,regimen,safety,timeline,oral,continuati
 import {organisms} from './data.js';
 let state={...initialState},step=0;
 const $=id=>document.getElementById(id);
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tri=[['unknown','尚未確認'],['no','否'],['yes','是']];
 const yes=[['unknown','尚未確認'],['yes','是／已完成'],['no','否／未完成']];
@@ -19,30 +20,33 @@ const steps=[
  {title:'腎功能與用藥安全',short:'腎臟安全',sub:'參考劑量轉成處方前，必須完成個別化核定。',fields:[
  select('renal','目前腎功能／腎臟替代治療',[['unknown','尚未確認'],['stable','穩定腎功能（含穩定 CKD）'],['aki','AKI／creatinine 變動中'],['hd','間歇 HD／HHD'],['pd','PD（CAPD／APD）'],['crrt','CRRT／PIRRT：需另核處方']]),number('crcl','藥物劑量用 CrCl（mL/min）','穩態時填；不是直接複製 eGFR mL/min/1.73m²。',250),number('weight','體重（kg）','用於 BMI 及體重劑量檢核；體液過多需另判乾體重。',300,1),number('height','身高（cm）','供口服轉換 BMI 檢核。',250,50),select('ufh','需要靜脈 UFH（含體外循環）',tri,'HD／CRRT／ECMO 也須確認。'),select('interactions','仍有未解決的重要交互作用',tri,'核對 warfarin／DOAC、免疫抑制劑、statin、血清素與 QT 藥物。')]},
  {title:'療程與感染源控制',short:'療程',sub:'計算最早複評日期，並確認哪些情況需要延長。',fields:[
- select('cleared','菌血症已清除',yes,'首次陰性培養需後續無再陽性支持。'),date('negativeDate','首次陰性血培養採样日期','首次陰性採樣日為累計有效療程第 1 天。'),select('surgery','本療程內接受瓣膜手術',tri),date('surgeryDate','瓣膜手術日期','手術日視為術後第 0 天；AHA 最低再治療 14 個完整日。'),number('duration','團隊選定總療程（週）','空白採 AHA 基準；若填入不得短於基準。黴菌不自動計算。',52,1),select('metastatic','有／未排除轉移性感染灶',tri,'如脊椎感染、脾膿瘍、腦膿瘍；需個別療程。'),select('sourceControl','感染源控制已完成',yes,'手術、導管／装置移除、引流等按個案需要完成。')]},
- {title:'出院與延續治療',short:'轉換與追蹤',sub:'逐項檢核 POET 條件，通過後仍需感染科確認實際組合。',fields:[
+ select('cleared','菌血症已清除',yes,'首次陰性培養需後續無再陽性支持。'),date('negativeDate','首次陰性血培養採樣日期','首次陰性採樣日為累計有效療程第 1 天。'),select('surgery','本療程內接受瓣膜手術',tri),date('surgeryDate','瓣膜手術日期','手術日視為術後第 0 天；AHA 最低再治療 14 個完整日。'),number('duration','團隊選定總療程（週）','空白採 AHA 基準；若填入不得短於基準。黴菌不自動計算。',52,1),select('metastatic','有／未排除轉移性感染灶',tri,'如脊椎感染、脾膿瘍、腦膿瘍；需個別療程。'),select('sourceControl','感染源控制已完成',yes,'手術、導管／裝置移除、引流等按個案需要完成。')]},
+ {title:'出院與延續治療',short:'轉換追蹤',sub:'逐項檢核 POET 條件，通過後仍需感染科確認實際組合。',fields:[
  number('ivDays','適當 IV 治療已完成天數','有效抗生素 ≥10 天。',365),number('daysPost','若已手術，術後天數','需 ≥7 天；未手術者免填。',365),number('afebrile','連續無發燒天數','至少 3 天。',365),number('crp','目前 CRP（mg/L）','若原值 mg/dL，乘 10 後填入。',1000),number('crpPeak','CRP 高峰（mg/L）','用來計算目前值是否 <高峰 25%。',1000),number('wbc','WBC（×10⁹/L）','例如 9000/µL 填 9。',300),number('teeDays','距安全 TEE 的天數','轉換前 2 天內；必須是 TEE，非僅 TTE。',365),select('teeSafe','TEE 無進展、膿瘍或新手術適應症',yes),select('absorb','能吸收並耐受口服藥',yes),select('adherence','病人能可靠按時服藥',yes),select('otherIV','同時有其他需 IV 治療的感染',tri),select('followup','已安排密切追蹤與抽血',yes)]}
 ];
 function fieldHTML(f){
  if(step===2&&['penMIC','cefMIC'].includes(f.key)&&state.organism!=='strep')return '';
  const id=f.key,value=state[id];
- return `<div class="field ${f.full?'full':''}"><label for="${id}">${esc(f.label)}</label>${f.options?`<select id="${id}" name="${id}" ${f.hint?`aria-describedby="hint-${id}"`:''}>${f.options.map(([v,t])=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(t)}</option>`).join('')}</select>`:`<input id="${id}" name="${id}" type="${f.type}" value="${esc(value)}" ${f.type==='number'?`min="${f.min}" max="${f.max}" step="any" inputmode="decimal"`:''} ${f.hint?`aria-describedby="hint-${id}"`:''}>`}${f.hint?`<small id="hint-${id}">${esc(f.hint)}</small>`:''}</div>`;
+ return `<div class="field ${f.full?'full':''}"><label for="${id}">${esc(f.label)}</label>${f.options?`<select id="${id}" name="${id}" ${f.hint?`aria-describedby="hint-${id}"`:''}>${f.options.map(([v,t])=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(t)}</option>`).join('')}</select>`:`<input id="${id}" name="${id}" type="${f.type}" value="${esc(value)}" ${f.type==='number'?`min="${f.min}" max="${f.max}" step="any" inputmode="decimal"`:''} ${f.type==='date'?`max="${today()}"`:''} ${f.hint?`aria-describedby="hint-${id}"`:''}>`}${f.hint?`<small id="hint-${id}">${esc(f.hint)}</small>`:''}</div>`;
 }
+const need={vegetation:()=>false,duration:()=>false,crpPeak:()=>false,penMIC:s=>s.organism==='strep',cefMIC:s=>s.organism==='strep',crcl:s=>s.renal==='stable',negativeDate:s=>s.cleared==='yes',surgeryDate:s=>s.surgery==='yes',daysPost:s=>s.surgery==='yes'};
+const pending=i=>steps[i].fields.filter(f=>(need[f.key]?need[f.key](state):true)&&(f.options?state[f.key]==='unknown':state[f.key]==='')).length;
+function renderSteps(){$('steps').innerHTML=steps.map((x,i)=>{const n=pending(i);return `<li><button data-step="${i}" ${i===step?'class="current" aria-current="step"':''}><span>${i+1}</span><span>${x.short}</span><em class="${n?'pend':'done'}" aria-label="${n?n+' 項待補':'已填完'}">${n||'✓'}</em></button></li>`;}).join('');}
 const list=xs=>`<ul>${xs.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
 function invalid(){
  const result=[];
  for(const def of steps.flatMap(x=>x.fields)){
   const v=state[def.key];if(def.type==='number'&&v!==''&&(!Number.isFinite(Number(v))||Number(v)<def.min||Number(v)>def.max))result.push(`${def.label} 請填 ${def.min}–${def.max}。`);
-  if(def.type==='date'&&v&&v>new Date().toISOString().slice(0,10))result.push(`${def.label} 不應是未來日期。`);
+  if(def.type==='date'&&v&&v>today())result.push(`${def.label} 不應是未來日期。`);
  }
  if(state.crp!==''&&state.crpPeak!==''&&Number(state.crp)>Number(state.crpPeak))result.push('目前 CRP 超過高峰，請確認高峰資料。');
  if(state.surgery==='yes'&&state.ivDays!==''&&state.daysPost!==''&&Number(state.daysPost)>Number(state.ivDays))result.push('術後天數超過已完成 IV 天數，請確認是否有口服治療或資料錯置；此工具以初始 IV 轉換評估。');
  return result;
 }
 function update(){
- const bad=invalid();$('inputErrors').innerHTML=bad.map(x=>`<p>${esc(x)}</p>`).join('');
+ renderSteps();const bad=invalid();$('inputErrors').innerHTML=bad.map(x=>`<p>${esc(x)}</p>`).join('');
  const u=surgical(state),r=regimen(state),t=timeline(state),o=oral(state);
- $('globalAlert').innerHTML=u.level==='emergency'?'<div class="notice danger"><b>立即處理：有休克／難治心衰竭觸發條件</b>現在就聯絡心臟外科、感染科及加護團隊；不要等到流程最後一步。</div>':u.level==='urgent'?'<div class="notice"><b>有感染源控制／急迫手術评估條件</b>請在推導抗生素同時啟動心內膜炎團隊討論。</div>':'';
+ $('globalAlert').innerHTML=u.level==='emergency'?'<div class="notice danger"><b>立即處理：有休克／難治心衰竭觸發條件</b>現在就聯絡心臟外科、感染科及加護團隊；不要等到流程最後一步。</div>':u.level==='urgent'?'<div class="notice"><b>有感染源控制／急迫手術評估條件</b>請在推導抗生素同時啟動心內膜炎團隊討論。</div>':'';
  if(bad.length){$('reason').innerHTML='<div class="notice danger">輸入值不合理，請先修正。暫停顯示此病例的治療推導。</div>';$('summary').textContent='資料需要修正：\n'+bad.join('\n');$('download').disabled=true;$('print').disabled=true;return;}
  $('download').disabled=false;$('print').disabled=false;
  let html='';
@@ -55,18 +59,17 @@ function update(){
  $('reason').innerHTML=html;$('summary').textContent=summary(state);
 }
 function render(){
- $('steps').innerHTML=steps.map((x,i)=>`<li><button data-step="${i}" ${i===step?'class="current" aria-current="step"':''}><span>${i+1}</span><span>${x.short}</span></button></li>`).join('');
  $('stepNumber').textContent=String(step+1).padStart(2,'0');$('stepTitle').textContent=steps[step].title;$('stepSubtitle').textContent=steps[step].sub;
  $('fields').className='fields';$('fields').innerHTML=steps[step].fields.map(fieldHTML).join('');$('back').disabled=step===0;$('next').textContent=step===5?'查看整合摘要':'下一步';update();
 }
-$('fields').addEventListener('input',e=>{if(!e.target.name)return;state[e.target.name]=e.target.value;if(e.target.name==='organism'){render();}else update();});
+$('fields').addEventListener('input',e=>{if(!e.target.name)return;state[e.target.name]=e.target.value;if(e.target.name==='organism'){render();$('organism').focus();}else update();});
 $('fields').addEventListener('submit',e=>e.preventDefault());
-$('steps').addEventListener('click',e=>{const b=e.target.closest('[data-step]');if(b){step=Number(b.dataset.step);render();}});
+$('steps').addEventListener('click',e=>{const b=e.target.closest('[data-step]');if(b){step=Number(b.dataset.step);render();if(matchMedia('(max-width:800px)').matches)document.querySelector('.stepTitle').scrollIntoView({block:'start'});}});
 $('back').addEventListener('click',()=>{if(step>0){step--;render();}});
 $('next').addEventListener('click',()=>{if(step<5){step++;render();document.querySelector('.stepTitle').scrollIntoView({block:'start'});}else document.querySelector('.summary').scrollIntoView({block:'start'});});
 $('sample').addEventListener('change',e=>{if(!samples[e.target.value])return;state={...initialState,...samples[e.target.value].state};if(e.target.value==='stable')state.negativeDate='2026-09-27';step=0;$('demo').textContent='教學資料，非真實病人';render();});
 $('reset').addEventListener('click',()=>{state={...initialState};step=0;$('sample').value='';$('demo').textContent='';render();});
-$('download').addEventListener('click',()=>{const blob=new Blob([summary(state)],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='IE-treatment-summary.txt';a.click();URL.revokeObjectURL(url);});
+$('download').addEventListener('click',()=>{const blob=new Blob([summary(state)],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='IE-treatment-summary.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('print').addEventListener('click',()=>window.print());
 for(const [nav,view] of [['guideNav','guide'],['correctionNav','correctionView'],['sourceNav','sourceView']])$(nav).addEventListener('click',()=>{for(const n of ['guideNav','correctionNav','sourceNav'])$(n).classList.toggle('active',n===nav);for(const v of ['guide','correctionView','sourceView'])$(v).hidden=v!==view;});
 $('correctionRows').innerHTML='<p><a href="docs/clinical-guide.md" download="感染性心內膜炎修訂治療指引.md">下載修訂後治療指引</a></p>'+corrections.map(([t,d,s])=>`<article class="correction"><h3>${esc(t)}</h3><div><p>${esc(d)}</p><small>依據：${esc(s)}</small></div></article>`).join('');

@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {initialState,oral,regimen,timeline,surgical,safety} from '../engine.js';import {samples} from '../data.js';
+import {initialState,oral,regimen,timeline,surgical,safety,summary} from '../engine.js';import {samples} from '../data.js';
 const stable=()=>({...initialState,...samples.stable.state,negativeDate:'2026-09-27'});
 test('unknown data cannot pass oral screening or create end date',()=>{assert.equal(oral(initialState).status,'incomplete');assert.equal(timeline(initialState).end,null);});
 test('stable MSSA candidate and 28 inclusive treatment days',()=>{assert.equal(oral(stable()).status,'candidate');assert.equal(timeline(stable()).end,'2026-10-24');assert.equal(timeline(stable()).days,28);});
@@ -16,3 +16,9 @@ test('unstable and cerebral bleed trigger immediate escalation',()=>{let s={...i
 test('BMI >40 blocks oral screening',()=>{assert.equal(oral({...stable(),weight:'120',height:'160'}).status,'blocked');});
 test('beta lactam allergy never yields default antipseudomonal or HACEK beta lactam dosing',()=>{for(const organism of ['hacek','pseudo'])assert.match(regimen({...stable(),organism,allergy:'severe'}).drugs.join(' '),/過敏/);});
 test('unknown renal function cannot pass oral readiness',()=>{assert.equal(oral({...stable(),renal:'unknown'}).status,'incomplete');assert.equal(oral({...stable(),crcl:''}).status,'incomplete');});
+test('bilateral IE triggers both vegetation size messages',()=>{const m=surgical({...stable(),side:'both',vegetation:'22'}).messages.join(' ');assert.match(m,/左側贅生物 ≥10 mm/);assert.match(m,/右側贅生物 >20 mm/);});
+test('surgery before first negative culture: course runs from clearance',()=>{const t=timeline({...stable(),surgery:'yes',surgeryDate:'2026-09-25'});assert.equal(t.end,'2026-10-24');assert.match(t.notes.join(' '),/手術早於首次轉陰/);});
+test('surgery after completed course does not auto-add 14 days',()=>{const t=timeline({...stable(),surgery:'yes',surgeryDate:'2026-10-30'});assert.equal(t.end,null);assert.match(t.notes.join(' '),/術後不需追加/);});
+test('MSSA allergy wording follows the allergy type',()=>{assert.match(regimen({...stable(),allergy:'mild'}).drugs.join(' '),/cefazolin 2 g IV q8h/);assert.match(regimen({...stable(),allergy:'severe'}).drugs.join(' '),/不直接給 β-lactam/);assert.match(regimen({...stable(),allergy:'unknown'}).drugs.join(' '),/過敏型態未確認/);});
+test('summary uses readable labels, not internal codes',()=>{const t=summary(stable());assert.match(t,/瓣膜：原生瓣膜 NVE；側別：左側；腎功能：穩定腎功能（CrCl 85 mL\/min）/);assert.match(t,/口服狀態：可進入團隊口服評估/);assert.doesNotMatch(t,/：native|：left|：candidate|：review/);});
+test('empirical therapy shows vancomycin AUC guidance',()=>{assert.match(safety({...stable(),organism:'unknown'}).join(' '),/AUC24/);});
