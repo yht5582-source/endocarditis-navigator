@@ -108,6 +108,7 @@ export function oral(s){
  const checks=[];
  const row=(label,status,detail)=>checks.push({label,status,detail});
  row('POET 病原', ['mssa','strep','faecalis'].includes(s.organism)?'pass':s.organism==='unknown'?'missing':'fail','穩定左側：MSSA／CoNS、鏈球菌、E. faecalis；MRSA／VRE／其他病原不自動外推');
+ row('腎功能資料已確認',s.renal==='unknown'||s.renal==='stable'&&num(s,'crcl')===null?'missing':'pass','腎病／透析口服藥仍需藥師個別核定劑量');
  row('左側且已確診',s.side==='left'&&s.diagnosis==='confirmed'?'pass':s.side==='unknown'||s.diagnosis==='unknown'?'missing':'fail','POET 左側 IE 的適用範圍');
  const iv=num(s,'ivDays'),post=num(s,'daysPost');
  row('有效 IV ≥10 天',iv===null?'missing':iv>=10?'pass':'fail','只計適當有效抗生素');
@@ -136,6 +137,7 @@ export function continuation(s){
   else messages.push('長效注射：尚未證實穩定／轉陰／感染源控制完成，不推薦轉換。');
  }
  if(s.ufh==='yes')messages.push('Oritavancin 不列候選：病人需靜脈 UFH，給藥後 120 小時為禁忌。');
+ messages.push('延續期至少定期（通常每週）追蹤 CBC、腎肝功能與藥物特定毒性，腎病／不穩定者更密集。完成療程時建立 TTE 基準與心臟／感染科追蹤；若再發燒或寒顫，抗生素前重新採血培養並評估復發。口腔衛生與高風險牙科處置預防另按院內規範。');
  messages.push('SAT：僅限手術適應症存在但無法手術、感染人工材料保留、黴菌等特定情境；完成初始治療後由團隊選藥、追蹤復發／毒性並定期重新評估，不能取代可行手術。');
  return messages;
 }

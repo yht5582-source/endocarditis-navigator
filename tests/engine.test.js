@@ -15,3 +15,4 @@ test('minimum course and missing surgery data are enforced',()=>{assert.equal(ti
 test('unstable and cerebral bleed trigger immediate escalation',()=>{let s={...initialState,...samples.urgent.state};assert.equal(surgical(s).level,'emergency');assert.match(surgical(s).messages.join(' '),/神經外科/);});
 test('BMI >40 blocks oral screening',()=>{assert.equal(oral({...stable(),weight:'120',height:'160'}).status,'blocked');});
 test('beta lactam allergy never yields default antipseudomonal or HACEK beta lactam dosing',()=>{for(const organism of ['hacek','pseudo'])assert.match(regimen({...stable(),organism,allergy:'severe'}).drugs.join(' '),/過敏/);});
+test('unknown renal function cannot pass oral readiness',()=>{assert.equal(oral({...stable(),renal:'unknown'}).status,'incomplete');assert.equal(oral({...stable(),crcl:''}).status,'incomplete');});

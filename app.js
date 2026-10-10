@@ -69,5 +69,5 @@ $('reset').addEventListener('click',()=>{state={...initialState};step=0;$('sampl
 $('download').addEventListener('click',()=>{const blob=new Blob([summary(state)],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='IE-treatment-summary.txt';a.click();URL.revokeObjectURL(url);});
 $('print').addEventListener('click',()=>window.print());
 for(const [nav,view] of [['guideNav','guide'],['correctionNav','correctionView'],['sourceNav','sourceView']])$(nav).addEventListener('click',()=>{for(const n of ['guideNav','correctionNav','sourceNav'])$(n).classList.toggle('active',n===nav);for(const v of ['guide','correctionView','sourceView'])$(v).hidden=v!==view;});
-$('correctionRows').innerHTML=corrections.map(([t,d,s])=>`<article class="correction"><h3>${esc(t)}</h3><div><p>${esc(d)}</p><small>依據：${esc(s)}</small></div></article>`).join('');
+$('correctionRows').innerHTML='<p><a href="docs/clinical-guide.md" download="感染性心內膜炎修訂治療指引.md">下載修訂後治療指引</a></p>'+corrections.map(([t,d,s])=>`<article class="correction"><h3>${esc(t)}</h3><div><p>${esc(d)}</p><small>依據：${esc(s)}</small></div></article>`).join('');
 $('sourceRows').innerHTML=sources.map(([t,d,u])=>`<article class="source"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)} ↗</a><p>${esc(d)}</p></article>`).join('');render();
