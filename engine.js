@@ -12,7 +12,7 @@ export function surgical(s){
  if(s.neuro==='bleed'||s.neuro==='major'){messages.push('重大缺血／顱內出血：神經科與神經外科共同評估影像、嚴重度及預後。穩定者常延後 2–4 週；心衰竭、失控感染或高栓塞風險時可個別考慮早期手術，不以固定等待期取代決策。');}
  if(s.neuro==='small')messages.push('小型缺血性中風且影像無出血、神經功能良好：有明確心臟適應症時通常不必延後。評估感染性動脈瘤與神經預後。');
  if(s.neuro==='coma')messages.push('昏迷：先判斷腦損傷、可逆性、鎮靜及代謝原因；AHA 對昏迷病人的心臟手術持否定立場，但網頁不能代替神經預後／無效醫療評估。');
- if(['bleed','major','small','coma'].includes(s.neuro))messages.push('立即腦 CT／MRI。疑感染性動脈瘤需 CTA／MRA，陰性但高度懷疑時討論 DSA。IE 相關缺血性中風不使用靜脈溶栓；大血管阻塞可由中風團隊評估機械取栓，仍有出血風險。');
+ if(['bleed','major','small','coma'].includes(s.neuro))messages.push('立即腦 CT／MRI。疑感染性動脈瘤需 CTA／MRA，陰性但高度懷疑時討論 DSA。IE 相關缺血性中風不使用靜脈溶栓；大血管阻塞可由中風團隊評估機械取栓：AHA 2026 指取栓似未造成出血併發症，但資料有限，且可能增加血管痙攣與內皮損傷；ESC 2023 列為特定個案可在時限內考慮。');
  if(s.cied==='yes')messages.push('CIED：確認囊袋、導線與瓣膜。確診裝置感染須完整移除；瓣膜 IE 即使導線無贅生物，也應討論完整移除、依賴度、感染病原與操作風險。');
  if(s.valve==='prosthetic')messages.push('PVE／TAVR：轉介有經驗的瓣膜中心。人工瓣膜本身不是所有病人立即手術的唯一依據；注意功能異常、脫離、膿瘍及持續感染。');
  const missing=['hf','unstable','abscess','persistent','embolism','neuro'].filter(k=>!has(s,k));
@@ -150,5 +150,5 @@ const lab=(k,v)=>LABEL[k][v]??'尚未確認';
 export function summary(s){
  const r=regimen(s),t=timeline(s),o=oral(s),u=surgical(s);
  const crcl=s.renal==='stable'&&num(s,'crcl')!==null?`（CrCl ${num(s,'crcl')} mL/min）`:'';
- return ['感染性心內膜炎治療導航 v1.2｜2026-11-01','臨床決策輔助；待感染科／心臟科／外科／藥師核定。',`病原：${organisms[s.organism]}；瓣膜：${lab('valve',s.valve)}；側別：${lab('side',s.side)}；腎功能：${lab('renal',s.renal)}${crcl}`,`診斷：${lab('diagnosis',s.diagnosis)}；血培養：${lab('cleared',s.cleared)}；首次陰性：${s.negativeDate||'待補'}`,`手術優先度：${lab('level',u.level)}`,...u.messages,'\n診斷',...diagnostic(s),'\n病原治療（正常腎功能成人參考，不是個別處方）',r.title,...r.drugs,...r.notes,'\n安全檢核',...safety(s),'\n療程',t.end?`最早複評日期：${t.end}`:'暫不提供停藥日期',...t.notes,'\n延續治療',`口服狀態：${lab('oral',o.status)}`,...o.checks.filter(x=>x.status!=='pass').map(x=>`${x.status==='missing'?'待補':'未通過'}：${x.label}`),...continuation(s),'\n依據：AHA 2026 DOI 10.1161/CIR.0000000000001466；ESC 2023 DOI 10.1093/eurheartj/ehad193；IDSA 黴菌與 vancomycin 指引；ORBACTIV 仿單。'].join('\n');
+ return ['感染性心內膜炎治療導航 v1.2.1｜2026-11-01','臨床決策輔助；待感染科／心臟科／外科／藥師核定。',`病原：${organisms[s.organism]}；瓣膜：${lab('valve',s.valve)}；側別：${lab('side',s.side)}；腎功能：${lab('renal',s.renal)}${crcl}`,`診斷：${lab('diagnosis',s.diagnosis)}；血培養：${lab('cleared',s.cleared)}；首次陰性：${s.negativeDate||'待補'}`,`手術優先度：${lab('level',u.level)}`,...u.messages,'\n診斷',...diagnostic(s),'\n病原治療（正常腎功能成人參考，不是個別處方）',r.title,...r.drugs,...r.notes,'\n安全檢核',...safety(s),'\n療程',t.end?`最早複評日期：${t.end}`:'暫不提供停藥日期',...t.notes,'\n延續治療',`口服狀態：${lab('oral',o.status)}`,...o.checks.filter(x=>x.status!=='pass').map(x=>`${x.status==='missing'?'待補':'未通過'}：${x.label}`),...continuation(s),'\n依據：AHA 2026 DOI 10.1161/CIR.0000000000001466；ESC 2023 DOI 10.1093/eurheartj/ehad193；IDSA 黴菌與 vancomycin 指引；ORBACTIV 仿單。'].join('\n');
 }
