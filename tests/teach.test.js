@@ -1,0 +1,22 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {initialState,surgical,regimen,safety,timeline,oral,continuation} from '../engine.js';import {cases,quiz,map} from '../teach.js';
+const load=c=>({...initialState,...c.state});
+test('eight cases with unique ids and only known engine fields',()=>{assert.equal(cases.length,8);assert.equal(new Set(cases.map(c=>c.id)).size,8);for(const c of cases)for(const k of Object.keys(c.state))assert.ok(k in initialState,`${c.id}.${k}`);});
+for(const c of cases)test(`case ${c.id} matches the engine`,()=>{
+ const s=load(c),e=c.expect,r=regimen(s),t=timeline(s);
+ assert.equal(surgical(s).level,e.level);assert.match(r.title,new RegExp(e.title));assert.equal(r.weeks,e.weeks);assert.equal(oral(s).status,e.oral);assert.equal(t.end,e.end);
+ if('days' in e)assert.equal(t.days,e.days);
+ if('renalUnsafe' in e)assert.equal(r.renalUnsafe,e.renalUnsafe);
+ if(e.drug)assert.match(r.drugs.join(' '),e.drug);
+ if(e.message)assert.match(surgical(s).messages.join(' '),e.message);
+ if(e.safety)assert.match(safety(s).join(' '),e.safety);
+});
+test('case dates are not future dates relative to authoring and survive validation rules',()=>{for(const c of cases){const s=c.state;for(const k of ['negativeDate','surgeryDate'])if(s[k])assert.ok(s[k]<='2026-11-01',c.id);if(s.crp&&s.crpPeak)assert.ok(Number(s.crp)<=Number(s.crpPeak),c.id);if(s.daysPost)assert.ok(Number(s.daysPost)<=Number(s.ivDays),c.id);}});
+test('quiz has 10 basic and 10 advanced with balanced answers',()=>{assert.equal(quiz.length,20);assert.equal(quiz.filter(q=>q.lv==='基礎').length,10);assert.equal(quiz.filter(q=>q.lv==='高階').length,10);const n=[0,0,0,0];for(const q of quiz){assert.equal(q.o.length,4);assert.equal(new Set(q.o).size,4);assert.ok(q.why&&q.src);n[q.a]++;}assert.deepEqual(n,[5,5,5,5]);});
+test('correct option is not a giveaway by length',()=>{const longest=quiz.filter(q=>q.o[q.a].length===Math.max(...q.o.map(x=>x.length))).length;assert.ok(longest<=10,`longest correct in ${longest} questions`);});
+test('quiz: post-operative floor question agrees with timeline()',()=>{const q=quiz.find(x=>x.q.includes('2026-09-24'));const t=timeline({...load(cases[0]),negativeDate:'2026-09-01',surgery:'yes',surgeryDate:'2026-09-24'});assert.equal(q.o[q.a],t.end);assert.equal(t.end,'2026-10-08');});
+test('quiz: POET TEE question agrees with oral()',()=>{const q=quiz.find(x=>x.q.includes('哪項尚未符合 POET'));const o=oral({...load(cases[0]),ivDays:'12',afebrile:'4',crp:'18',wbc:'11',teeDays:'5'});assert.equal(q.o[q.a],'TEE 時間');assert.deepEqual(o.checks.filter(c=>c.status==='fail').map(c=>c.label),['轉換前 2 天內安全 TEE']);});
+test('quiz: strep MIC question agrees with regimen() stopping auto monotherapy',()=>{assert.match(regimen({...load(cases[1]),penMIC:'1',cefMIC:'1'}).drugs.join(' '),/停止自動單藥/);});
+test('quiz: oritavancin and E. faecalis answers agree with the engine',()=>{assert.equal(quiz.find(x=>x.q.includes('oritavancin')).o[quiz.find(x=>x.q.includes('oritavancin')).a],'120 小時');assert.match(safety({...initialState,ufh:'yes'}).join(' '),/120 小時/);assert.match(regimen({...load(cases[2])}).drugs.join(' '),/Ampicillin.*ceftriaxone/);});
+test('continuation for the PWID case offers dalbavancin discussion, not oral',()=>{const m=continuation(load(cases.find(c=>c.id==='pwid'))).join(' ');assert.match(m,/dalbavancin/);assert.match(m,/不自動推薦口服/);});
+test('mind map has both sides with content',()=>{for(const side of [map.left,map.right]){assert.ok(side.branches.length>=5);for(const b of side.branches)assert.ok(b.t&&b.i.length>=3);}});

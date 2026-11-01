@@ -1,6 +1,7 @@
 import {sources,corrections,samples} from './data.js';
 import {initialState,surgical,diagnostic,regimen,safety,timeline,oral,continuation,summary} from './engine.js';
 import {organisms} from './data.js';
+import {cases,quiz,map} from './teach.js';
 let state={...initialState},step=0;
 const $=id=>document.getElementById(id);
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
@@ -71,6 +72,33 @@ $('sample').addEventListener('change',e=>{if(!samples[e.target.value])return;sta
 $('reset').addEventListener('click',()=>{state={...initialState};step=0;$('sample').value='';$('demo').textContent='';render();});
 $('download').addEventListener('click',()=>{const blob=new Blob([summary(state)],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='IE-treatment-summary.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
 $('print').addEventListener('click',()=>window.print());
-for(const [nav,view] of [['guideNav','guide'],['correctionNav','correctionView'],['sourceNav','sourceView']])$(nav).addEventListener('click',()=>{for(const n of ['guideNav','correctionNav','sourceNav'])$(n).classList.toggle('active',n===nav);for(const v of ['guide','correctionView','sourceView'])$(v).hidden=v!==view;});
+const views=[['guideNav','guide',''],['casesNav','casesView','cases'],['quizNav','quizView','quiz'],['mapNav','mapView','map'],['correctionNav','correctionView','corrections'],['sourceNav','sourceView','sources']];
+function show(nav){const row=views.find(x=>x[0]===nav)??views[0];for(const [n,v] of views){$(n).classList.toggle('active',n===row[0]);$(v).hidden=v!==row[1];}document.querySelector('.intro').hidden=row[0]!=='guideNav';return row;}
+function route(){const h=location.hash.slice(1).split('/')[0],row=show((views.find(x=>x[2]===h)??views[0])[0]);if(row[0]==='casesNav'){const id=location.hash.split('/')[1],el=$('case-'+id);if(el){el.open=true;$('wrap-'+id).scrollIntoView({block:'start'});}}}
+for(const [nav,,hash] of views)$(nav).addEventListener('click',()=>{history.replaceState(null,'',hash?'#'+hash:location.pathname+location.search);show(nav);scrollTo(0,0);});
+addEventListener('hashchange',route);
+const levelText={emergency:'緊急：立即聯絡外科／加護',urgent:'急迫：儘速團隊評估',review:'無明確緊急觸發，持續評估'},oralText={candidate:'可進入團隊口服評估',blocked:'目前不宜依本路徑轉口服',incomplete:'資料不足，不能判定'};
+function caseVerdict(c){const s={...initialState,...c.state},u=surgical(s),r=regimen(s),t=timeline(s),o=oral(s),fails=o.checks.filter(x=>x.status==='fail').map(x=>x.label);return [['手術優先度',levelText[u.level]],['方案類別',`${r.title}${r.weeks?`，基準 ${r.weeks} 週`:'，療程個別化'}`],['參考藥物',r.drugs.join('；')],['最早複評日',t.end?`${t.end}（第 ${t.days} 天）`:'不提供'],['口服初篩',oralText[o.status]+(fails.length?`（未通過：${fails.slice(0,4).join('、')}${fails.length>4?` 等 ${fails.length} 項`:''}）`:'')]];}
+$('caseJump').innerHTML=cases.map((c,i)=>`<a class="chip" href="#cases/${c.id}">${i+1}. ${esc(c.tag)}</a>`).join('');
+$('caseRows').innerHTML=cases.map((c,i)=>`<article class="caseCard" id="${'wrap-'+c.id}"><p class="eyebrow">CASE ${i+1} · ${esc(c.tag)}</p><h3>${esc(c.title)}</h3><p>${esc(c.story)}</p><p class="think"><b>想一想</b>${esc(c.think)}</p><details id="case-${c.id}"><summary>看工具判讀與解析</summary><table class="checklist verdict"><tbody>${caseVerdict(c).map(([k,v])=>`<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</tbody></table><h4>教學重點</h4>${list(c.points)}<p class="reference">依據：${esc(c.source)}</p></details><button class="primary" data-load="${c.id}">帶入工具</button></article>`).join('');
+$('caseRows').addEventListener('click',e=>{const b=e.target.closest('[data-load]');if(!b)return;const c=cases.find(x=>x.id===b.dataset.load);state={...initialState,...c.state};step=0;$('sample').value='';$('demo').textContent=`教學資料，非真實病人：${c.title}`;history.replaceState(null,'',location.pathname+location.search);show('guideNav');render();document.querySelector('.tools').scrollIntoView({block:'start'});});
+let answers={},quizLevel='全部';
+function renderQuiz(){
+ $('quizFilter').innerHTML=['全部','基礎','高階'].map(x=>`<button data-level="${x}" class="chip ${x===quizLevel?'active':''}" aria-pressed="${x===quizLevel}">${x}</button>`).join('');
+ const shown=quiz.map((q,i)=>[q,i]).filter(([q])=>quizLevel==='全部'||q.lv===quizLevel),done=shown.filter(([,i])=>i in answers),right=done.filter(([q,i])=>answers[i]===q.a).length;
+ $('quizScore').textContent=`已答 ${done.length}／${shown.length}，答對 ${right}`;
+ $('quizRows').innerHTML=shown.map(([q,i])=>{const a=answers[i],ans=a!==undefined;return `<article class="quizCard"><p class="eyebrow">第 ${i+1} 題 · ${q.lv}</p><h3>${esc(q.q)}</h3><div class="options">${q.o.map((t,j)=>`<button data-q="${i}" data-o="${j}" ${ans?'disabled':''} class="${ans?(j===q.a?'right':j===a?'wrong':''):''}"><b>${'ABCD'[j]}</b>${esc(t)}</button>`).join('')}</div>${ans?`<div class="notice ${a===q.a?'good':'danger'}" role="status"><b>${a===q.a?'答對':`答錯，正解 ${'ABCD'[q.a]}`}</b>${esc(q.why)}<small>依據：${esc(q.src)}</small></div>`:''}</article>`;}).join('');
+}
+$('quizRows').addEventListener('click',e=>{const b=e.target.closest('[data-q]');if(!b)return;const y=scrollY;answers[Number(b.dataset.q)]=Number(b.dataset.o);renderQuiz();scrollTo(0,y);});
+$('quizFilter').addEventListener('click',e=>{const b=e.target.closest('[data-level]');if(b){quizLevel=b.dataset.level;renderQuiz();}});
+$('quizReset').addEventListener('click',()=>{answers={};renderQuiz();scrollTo(0,0);});
+renderQuiz();
+const branch=(b,side,i)=>`<li class="mapBranch"><button class="mapNode" aria-expanded="true" aria-controls="m-${side}-${i}">${esc(b.t)}</button><ul class="mapLeaves" id="m-${side}-${i}">${b.i.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></li>`;
+const mapSide=(s,side)=>`<section class="mapSide ${side}" aria-label="${esc(s.title)}"><h3>${esc(s.title)}</h3><ul>${s.branches.map((b,i)=>branch(b,side,i)).join('')}</ul></section>`;
+$('mindmap').innerHTML=`<div class="mapRoot"><b>${esc(map.root)}</b><small>${esc(map.sub)}</small></div>${mapSide(map.left,'left')}${mapSide(map.right,'right')}`;
+const setNode=(n,open)=>{n.setAttribute('aria-expanded',open);$(n.getAttribute('aria-controls')).hidden=!open;};
+$('mindmap').addEventListener('click',e=>{const n=e.target.closest('.mapNode');if(n)setNode(n,n.getAttribute('aria-expanded')!=='true');});
+$('mapOpen').addEventListener('click',()=>document.querySelectorAll('.mapNode').forEach(n=>setNode(n,true)));
+$('mapClose').addEventListener('click',()=>document.querySelectorAll('.mapNode').forEach(n=>setNode(n,false)));
 $('correctionRows').innerHTML='<p><a href="docs/clinical-guide.md" download="感染性心內膜炎修訂治療指引.md">下載修訂後治療指引</a></p>'+corrections.map(([t,d,s])=>`<article class="correction"><h3>${esc(t)}</h3><div><p>${esc(d)}</p><small>依據：${esc(s)}</small></div></article>`).join('');
-$('sourceRows').innerHTML=sources.map(([t,d,u])=>`<article class="source"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)} ↗</a><p>${esc(d)}</p></article>`).join('');render();
+$('sourceRows').innerHTML=sources.map(([t,d,u])=>`<article class="source"><a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(t)} ↗</a><p>${esc(d)}</p></article>`).join('');render();route();
